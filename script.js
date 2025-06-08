@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name 蜜柑计划增加在线播放按钮
 // @namespace https://mikanani.me/
-// @version 0.18
+// @version 0.19
 // @description 蜜柑计划增加在线播放按钮
 // @author Iko
 // @match https://mikanani.me/*
@@ -512,8 +512,9 @@
 
             const infoHash = match[1];
             const os = detectOS();
+            let localPlayBtn;
             if(os == 'Windows' || os == 'MacOS'){
-                const localPlayBtn = createLocalPlayButton(magnet, infoHash);
+                localPlayBtn = createLocalPlayButton(magnet, infoHash);
             }
             const webPlayBtn = createWebPlayButton(magnet, infoHash);
             if(os == 'Windows' || os == 'MacOS'){
