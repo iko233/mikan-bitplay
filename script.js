@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name 蜜柑计划增加在线播放按钮
 // @namespace https://mikanani.me/
-// @version 0.19
+// @version 1.0
 // @description 蜜柑计划增加在线播放按钮
 // @author Iko
 // @match https://mikanani.me/*
