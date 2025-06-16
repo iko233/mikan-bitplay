@@ -317,7 +317,7 @@
 
     // 播放和下载实现函数
     function playFileWithLocalPlayer(host, infoHash, fileIndex) {
-        const streamURL = `${host}/api/v1/torrent/${infoHash}/stream/${fileIndex}`;
+        const streamURL = `${host}/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
         const os = detectOS();
 
         console.log(`使用本地播放器播放: ${streamURL}`);
@@ -332,7 +332,7 @@
     }
 
     function playFileInBrowser(host, infoHash, fileIndex) {
-        const streamURL = `${host}/api/v1/torrent/${infoHash}/stream/${fileIndex}`;
+        const streamURL = `${host}/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
         console.log(`在浏览器中播放: ${streamURL}`);
         window.open(streamURL, '_blank');
     }
