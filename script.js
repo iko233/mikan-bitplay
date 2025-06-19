@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name 蜜柑计划增加在线播放按钮
 // @namespace https://mikanani.me/
-// @version 1.0
+// @version 1.1
 // @description 蜜柑计划增加在线播放按钮
 // @author Iko
 // @match https://mikanani.me/*
@@ -32,9 +32,11 @@
     // 检测操作系统类型
     function detectOS() {
         const platform = navigator.platform.toLowerCase();
+        console.log("platform:",platform);
         if (platform.includes('win')) return 'Windows';
         if (platform.includes('mac')) return 'MacOS';
         if (platform.includes('linux')) return 'Linux';
+        if (platform.includes('ipad')) return 'ipad';
         return 'Unknown';
     }
 
@@ -326,6 +328,8 @@
             window.open(`iina://weblink?url=${streamURL}`);
         } else if (os === 'Windows') {
             window.open(`potplayer://${streamURL}`);
+        } else if (os === 'ipad') {
+            window.location.href=`Alook://${streamURL}`;
         } else {
             alert('检测到未知系统，播放链接：\n' + streamURL);
         }
@@ -431,7 +435,17 @@
     // 创建本地播放按钮
     function createLocalPlayButton(magnet, infoHash) {
         const os = detectOS();
-        const playerBtnName = os === 'MacOS' ? 'IINA' : 'PotPlayer';
+        let playerBtnName = '';
+        if ( os === 'MacOS'){
+            playerBtnName = 'IINA';
+        }
+        if ( os === 'Windows'){
+            playerBtnName = 'PotPlayer';
+        } 
+        if ( os === 'ipad'){
+            playerBtnName = 'ALOOK';
+        }
+        
         const btn = document.createElement('button');
         btn.textContent = `▶ ${playerBtnName}播放`;
         Object.assign(btn.style, {
@@ -487,14 +501,14 @@
 
             const infoHash = match[1];
             const os = detectOS();
-            if(os == 'Windows' || os == 'MacOS'){
+            if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
                 const localPlayBtn = createLocalPlayButton(magnet, infoHash);
                 container.appendChild(localPlayBtn);
             }
             const webPlayBtn = createWebPlayButton(magnet, infoHash);
 
 
-            
+
             container.appendChild(webPlayBtn);
             container.dataset.buttonAdded = '1';
         });
@@ -516,11 +530,11 @@
             const infoHash = match[1];
             const os = detectOS();
             let localPlayBtn;
-            if(os == 'Windows' || os == 'MacOS'){
+            if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
                 localPlayBtn = createLocalPlayButton(magnet, infoHash);
             }
             const webPlayBtn = createWebPlayButton(magnet, infoHash);
-            if(os == 'Windows' || os == 'MacOS'){
+            if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
                 magnetElement.parentNode.insertBefore(localPlayBtn, magnetElement.nextSibling);
                 magnetElement.parentNode.insertBefore(webPlayBtn, localPlayBtn.nextSibling);
             }else{
