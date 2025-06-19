@@ -334,7 +334,10 @@
     function playFileInBrowser(host, infoHash, fileIndex) {
         const streamURL = `${host}/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
         console.log(`在浏览器中播放: ${streamURL}`);
-        window.open(streamURL, '_blank');
+        const success = window.open(streamURL, '_blank');
+        if(!success){
+            window.location.href = streamURL;
+        }
     }
 
     // 按钮状态管理
