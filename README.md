@@ -11,6 +11,8 @@ docker run -d \
   ghcr.io/aculix/bitplay:main
 ```
 
+脚本需要配置后台服务器列表(SERVER_LIST)的服务器地址,同时需要配置脚本声明头的// @connect bitplay.to
+
 ![image](https://github.com/user-attachments/assets/2915dbda-c87d-4583-bee8-4f8a53f5db2e)
 
 ![image](https://github.com/user-attachments/assets/8deaa8fb-6162-4cc6-9276-94b3129f4d75)
