@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name 蜜柑计划增加在线播放按钮
 // @namespace https://mikanani.me/
-// @version 1.1
+// @version 2.0
 // @description 蜜柑计划增加在线播放按钮
 // @author Iko
 // @match https://mikanani.me/*
@@ -39,7 +39,6 @@
         if (platform.includes('ipad')) return 'ipad';
         return 'Unknown';
     }
-
 
     // 页面类型检测函数
     function isHomePage() {
@@ -178,8 +177,29 @@
         });
     }
 
+    // 批量下载所有文件
+    function downloadAllFiles(files, infoHash) {
+        let currentIndex = 0;
+
+        function downloadNext() {
+            if (currentIndex < files.length) {
+                const file = files[currentIndex];
+                console.log(`正在下载第 ${currentIndex + 1}/${files.length} 个文件: ${file.name}`);
+                downloadFile(infoHash, file.index, file.name);
+                currentIndex++;
+
+                // 0.5秒后下载下一个文件
+                setTimeout(downloadNext, 500);
+            } else {
+                console.log('所有文件下载完成');
+            }
+        }
+
+        downloadNext();
+    }
+
     // 文件选择对话框
-    function createFileSelectionDialog(files, infoHash) {
+    function createFileSelectionDialog(files, infoHash, actionType) {
         const overlay = document.createElement('div');
         Object.assign(overlay.style, {
             position: 'fixed',
@@ -206,7 +226,7 @@
         });
 
         const title = document.createElement('h3');
-        title.textContent = '请选择要下载的文件';
+        title.textContent = actionType === 'download' ? '请选择要下载的文件' : '请选择要播放的文件';
         title.style.marginTop = '0';
         title.style.marginBottom = '20px';
         title.style.color = '#333';
@@ -241,7 +261,13 @@
 
             fileItem.addEventListener('click', () => {
                 overlay.remove();
-                directDownloadFile(infoHash, file.index, file.name);
+                if (actionType === 'download') {
+                    downloadFile(infoHash, file.index, file.name);
+                } else if (actionType === 'web_play') {
+                    playFileInBrowser(currentServer.url, infoHash, file.index, file.name);
+                } else if (actionType === 'local_play') {
+                    playFileWithLocalPlayer(currentServer.url, infoHash, file.index, file.name);
+                }
             });
 
             fileList.appendChild(fileItem);
@@ -249,10 +275,37 @@
 
         dialog.appendChild(fileList);
 
+        // 按钮容器
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.marginTop = '20px';
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.justifyContent = 'flex-end';
+        buttonContainer.style.gap = '10px';
+
+        // 如果是下载操作且有多个文件，添加"下载全部"按钮
+        if (actionType === 'download' && files.length > 1) {
+            const downloadAllButton = document.createElement('button');
+            downloadAllButton.textContent = '⬇ 下载全部';
+            Object.assign(downloadAllButton.style, {
+                padding: '8px 16px',
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+            });
+
+            downloadAllButton.addEventListener('click', () => {
+                overlay.remove();
+                downloadAllFiles(files, infoHash);
+            });
+
+            buttonContainer.appendChild(downloadAllButton);
+        }
+
         const cancelButton = document.createElement('button');
         cancelButton.textContent = '取消';
         Object.assign(cancelButton.style, {
-            marginTop: '20px',
             padding: '8px 16px',
             backgroundColor: '#ccc',
             color: '#333',
@@ -265,7 +318,8 @@
             overlay.remove();
         });
 
-        dialog.appendChild(cancelButton);
+        buttonContainer.appendChild(cancelButton);
+        dialog.appendChild(buttonContainer);
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
     }
@@ -279,20 +333,15 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    // 直接触发浏览器下载
-    function directDownloadFile(infoHash, fileIndex, fileName) {
-        const downloadURL = `${currentServer.url}/api/v1/torrent/${infoHash}/stream/${fileIndex}/${fileName}.mp4`;
-        const a = document.createElement('a');
-        a.href = downloadURL;
-        a.download = fileName;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+    // 新的下载文件函数
+    function downloadFile(infoHash, fileIndex, fileName) {
+        const downloadURL = `https://bitplay.bitchigo.icu/api/v1/torrent/${infoHash}/stream/${fileIndex}/${fileName}.mp4`;
+        console.log(`下载文件: ${downloadURL}`);
+        window.open(downloadURL, '_blank');
     }
 
     // 获取文件列表
-    function getFileList(infoHash, callback, btn, defaultText) {
+    function getFileList(infoHash, callback, btn, defaultText, actionType) {
         makeRequest({
             method: 'GET',
             url: `${currentServer.url}/api/v1/torrent/${infoHash}`,
@@ -301,7 +350,7 @@
                     try {
                         const files = JSON.parse(listRes.responseText);
                         if (files && Array.isArray(files)) {
-                            callback(files, infoHash, btn, defaultText);
+                            callback(files, infoHash, btn, defaultText, actionType);
                         } else {
                             handleButtonError(btn, '文件列表格式错误', defaultText);
                         }
@@ -318,7 +367,7 @@
     }
 
     // 播放和下载实现函数
-    function playFileWithLocalPlayer(host, infoHash, fileIndex) {
+    function playFileWithLocalPlayer(host, infoHash, fileIndex, fileName) {
         const streamURL = `${host}/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
         const os = detectOS();
 
@@ -335,8 +384,8 @@
         }
     }
 
-    function playFileInBrowser(host, infoHash, fileIndex) {
-        const streamURL = `${host}/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
+    function playFileInBrowser(host, infoHash, fileIndex, fileName) {
+        const streamURL = `https://bitplay.bitchigo.icu/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
         console.log(`在浏览器中播放: ${streamURL}`);
         const success = window.open(streamURL, '_blank');
         if(!success){
@@ -361,10 +410,6 @@
         btn.disabled = true;
         btn.textContent = '加载中…';
 
-
-        const os = detectOS();
-        const playerName = os === 'MacOS' ? 'IINA' : 'PotPlayer';
-        const playerBtnName = `▶ ${playerName}播放`;
         makeRequest({
             method: 'POST',
             url: `${host}/api/v1/torrent/add`,
@@ -375,14 +420,14 @@
                     setupTorrentRefresh(magnet, infoHash);
                     btn.textContent = '获取文件列表中…';
                     setTimeout(() => {
-                        getFileList(infoHash, handleFileListForPlay, btn, playerBtnName);
+                        getFileList(infoHash, handleFileListForAction, btn, '▶ 播放器播放', 'local_play');
                     }, 1000);
                 } else {
-                    handleButtonError(btn, '添加失败，状态码：' + res.status, playerBtnName);
+                    handleButtonError(btn, '添加失败，状态码：' + res.status, '▶ 播放器播放');
                 }
             },
-            onerror: () => handleButtonError(btn, '请求出错', playerBtnName),
-            ontimeout: () => handleButtonError(btn, '请求超时', playerBtnName)
+            onerror: () => handleButtonError(btn, '请求出错', '▶ 播放器播放'),
+            ontimeout: () => handleButtonError(btn, '请求超时', '▶ 播放器播放')
         });
     }
 
@@ -401,7 +446,7 @@
                     setupTorrentRefresh(magnet, infoHash);
                     btn.textContent = '获取文件列表中…';
                     setTimeout(() => {
-                        getFileList(infoHash, handleFileListForPlay, btn, '🌐 网页播放');
+                        getFileList(infoHash, handleFileListForAction, btn, '🌐 网页播放', 'web_play');
                     }, 1000);
                 } else {
                     handleButtonError(btn, '添加失败，状态码：' + res.status, '🌐 网页播放');
@@ -412,42 +457,55 @@
         });
     }
 
-    // 处理文件列表并播放
-    function handleFileListForPlay(files, infoHash, btn, defaultText) {
+    function handleDownloadButtonClick(btn, magnet, infoHash) {
+        const host = currentServer.url;
+        btn.disabled = true;
+        btn.textContent = '加载中…';
+
+        makeRequest({
+            method: 'POST',
+            url: `${host}/api/v1/torrent/add`,
+            headers: { 'Content-Type': 'application/json' },
+            data: JSON.stringify({ magnet }),
+            onload(res) {
+                if (res.status >= 200 && res.status < 300) {
+                    setupTorrentRefresh(magnet, infoHash);
+                    btn.textContent = '获取文件列表中…';
+                    setTimeout(() => {
+                        getFileList(infoHash, handleFileListForAction, btn, '⬇ 下载', 'download');
+                    }, 1000);
+                } else {
+                    handleButtonError(btn, '添加失败，状态码：' + res.status, '⬇ 下载');
+                }
+            },
+            onerror: () => handleButtonError(btn, '请求出错', '⬇ 下载'),
+            ontimeout: () => handleButtonError(btn, '请求超时', '⬇ 下载')
+        });
+    }
+
+    // 处理文件列表
+    function handleFileListForAction(files, infoHash, btn, defaultText, actionType) {
         if (files.length === 1) {
-            if (defaultText.includes('网页')) {
-                playFileInBrowser(currentServer.url, infoHash, 0);
-            } else {
-                playFileWithLocalPlayer(currentServer.url, infoHash, 0);
+            if (actionType === 'download') {
+                downloadFile(infoHash, 0, files[0].name);
+            } else if (actionType === 'web_play') {
+                playFileInBrowser(currentServer.url, infoHash, 0, files[0].name);
+            } else if (actionType === 'local_play') {
+                playFileWithLocalPlayer(currentServer.url, infoHash, 0, files[0].name);
             }
         } else if (files.length > 1) {
             btn.textContent = '请选择文件…';
-            createFileSelectionDialog(files, infoHash);
-            files.forEach((file, index) => {
-                // 已在createFileSelectionDialog中处理
-            });
+            createFileSelectionDialog(files, infoHash, actionType);
         } else {
-            handleButtonError(btn, '没有找到可播放的文件', defaultText);
+            handleButtonError(btn, '没有找到可用的文件', defaultText);
         }
         resetButton(btn, defaultText);
     }
 
-    // 创建本地播放按钮
+    // 创建播放器播放按钮（简化版）
     function createLocalPlayButton(magnet, infoHash) {
-        const os = detectOS();
-        let playerBtnName = '';
-        if ( os === 'MacOS'){
-            playerBtnName = 'IINA';
-        }
-        if ( os === 'Windows'){
-            playerBtnName = 'PotPlayer';
-        } 
-        if ( os === 'ipad'){
-            playerBtnName = 'ALOOK';
-        }
-        
         const btn = document.createElement('button');
-        btn.textContent = `▶ ${playerBtnName}播放`;
+        btn.textContent = '▶ 播放器播放';
         Object.assign(btn.style, {
             marginLeft: '10px',
             padding: '2px 6px',
@@ -486,6 +544,27 @@
         return btn;
     }
 
+    // 创建下载按钮
+    function createDownloadButton(magnet, infoHash) {
+        const btn = document.createElement('button');
+        btn.textContent = '⬇ 下载';
+        Object.assign(btn.style, {
+            marginLeft: '5px',
+            padding: '2px 6px',
+            background: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+        });
+
+        btn.addEventListener('click', () => {
+            handleDownloadButtonClick(btn, magnet, infoHash);
+        });
+
+        return btn;
+    }
+
     // 页面按钮添加
     function addButtonsToHomePage() {
         const containers = document.querySelectorAll('.sk-col.res-name.word-wrap');
@@ -501,15 +580,18 @@
 
             const infoHash = match[1];
             const os = detectOS();
+
             if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
                 const localPlayBtn = createLocalPlayButton(magnet, infoHash);
                 container.appendChild(localPlayBtn);
             }
+
             const webPlayBtn = createWebPlayButton(magnet, infoHash);
-
-
-
             container.appendChild(webPlayBtn);
+
+            const downloadBtn = createDownloadButton(magnet, infoHash);
+            container.appendChild(downloadBtn);
+
             container.dataset.buttonAdded = '1';
         });
     }
@@ -529,17 +611,24 @@
 
             const infoHash = match[1];
             const os = detectOS();
+
             let localPlayBtn;
             if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
                 localPlayBtn = createLocalPlayButton(magnet, infoHash);
             }
+
             const webPlayBtn = createWebPlayButton(magnet, infoHash);
+            const downloadBtn = createDownloadButton(magnet, infoHash);
+
             if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
                 magnetElement.parentNode.insertBefore(localPlayBtn, magnetElement.nextSibling);
                 magnetElement.parentNode.insertBefore(webPlayBtn, localPlayBtn.nextSibling);
-            }else{
+                magnetElement.parentNode.insertBefore(downloadBtn, webPlayBtn.nextSibling);
+            } else {
                 magnetElement.parentNode.insertBefore(webPlayBtn, magnetElement.nextSibling);
+                magnetElement.parentNode.insertBefore(downloadBtn, webPlayBtn.nextSibling);
             }
+
             magnetElement.dataset.buttonAdded = '1';
         });
     }
