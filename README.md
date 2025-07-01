@@ -5,7 +5,7 @@
 docker run -d \
   --name bitplay \
   -p 3347:3347 \
-  -v $(pwd)/torrent-data:/app/torrent-data
+  -v $(pwd)/torrent-data:/app/torrent-data \
   -v $(pwd)/config:/app/config \
   --restart unless-stopped \
   ghcr.io/aculix/bitplay:main
