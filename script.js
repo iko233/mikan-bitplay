@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name 蜜柑计划增加在线播放按钮
 // @namespace https://mikanani.me/
-// @version 2.0
+// @version 3.0
 // @description 蜜柑计划增加在线播放按钮
 // @author Iko
 // @match https://mikanani.me/*
@@ -9,6 +9,7 @@
 // @grant GM.setValue
 // @grant GM.getValue
 // @grant GM.registerMenuCommand
+// @grant GM.unregisterMenuCommand
 // @connect bitplay.to
 // @icon https://mikanani.me/images/favicon.ico?v=2
 // ==/UserScript==
@@ -34,7 +35,7 @@
     // 检测操作系统类型
     function detectOS() {
         const platform = navigator.platform.toLowerCase();
-        console.log("platform:",platform);
+        console.log("platform:", platform);
         if (platform.includes('win')) return 'Windows';
         if (platform.includes('mac')) return 'MacOS';
         if (platform.includes('linux')) return 'Linux';
@@ -49,8 +50,8 @@
 
     function isBangumiPage() {
         return location.pathname.startsWith('/Home/Bangumi/') ||
-               location.pathname.startsWith('/Home/Search') ||
-               location.pathname.startsWith('/Home/Classic');
+            location.pathname.startsWith('/Home/Search') ||
+            location.pathname.startsWith('/Home/Classic');
     }
 
     // 网络请求封装
@@ -63,19 +64,19 @@
         const originalOnerror = options.onerror;
         const originalOntimeout = options.ontimeout;
 
-        options.onload = function(response) {
+        options.onload = function (response) {
             console.log('=== 收到网络响应 ===');
             console.log('状态码:', response.status);
             if (originalOnload) originalOnload(response);
         };
 
-        options.onerror = function(error) {
+        options.onerror = function (error) {
             console.log('=== 网络请求错误 ===');
             console.log('错误信息:', error);
             if (originalOnerror) originalOnerror(error);
         };
 
-        options.ontimeout = function() {
+        options.ontimeout = function () {
             console.log('=== 网络请求超时 ===');
             if (originalOntimeout) originalOntimeout();
         };
@@ -117,7 +118,7 @@
         if (serverInfoDiv) {
             const pingText = currentServer.ping === 9999 ? '超时' : `${currentServer.ping}ms`;
             const pingColor = currentServer.ping < 100 ? '#4CAF50' :
-                             currentServer.ping < 300 ? '#FF9800' : '#F44336';
+                currentServer.ping < 300 ? '#FF9800' : '#F44336';
             serverInfoDiv.innerHTML = `
                 当前播放服务器: ${currentServer.name}
                 <span style="color: ${pingColor}; font-weight: bold;">(${pingText})</span>
@@ -141,9 +142,10 @@
         }
     }
 
-    function registerMenuCommands() {
+    async function registerMenuCommands() {
         if (typeof GM.unregisterMenuCommand === 'function') {
             menuCommandIds.forEach(id => {
+                console.log("注销菜单id:", id)
                 try { GM.unregisterMenuCommand(id); } catch (e) { console.error(e); }
             });
             menuCommandIds = [];
@@ -151,14 +153,16 @@
 
         SERVER_LIST.forEach((server, index) => {
             const prefix = (server.url === currentServer.url) ? '✓ ' : '';
-            const id = GM.registerMenuCommand(
+            GM.registerMenuCommand(
                 `${prefix}切换到服务器: ${server.name}`,
                 () => setServerIndex(index),
                 `${index + 1}`
-            );
-            if (typeof id !== 'undefined') {
-                menuCommandIds.push(id);
-            }
+            ).then(id => {
+                if (typeof id !== 'undefined') {
+                    console.log("注册菜单id:", id)
+                    menuCommandIds.push(id);
+                }
+            })
         });
     }
 
@@ -393,7 +397,7 @@
         } else if (os === 'Windows') {
             window.open(`potplayer://${streamURL}`);
         } else if (os === 'ipad') {
-            window.location.href=`Alook://${streamURL}`;
+            window.location.href = `Alook://${streamURL}`;
         } else {
             alert('检测到未知系统，播放链接：\n' + streamURL);
         }
@@ -403,7 +407,7 @@
         const streamURL = `${currentServer.url}/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
         console.log(`在浏览器中播放: ${streamURL}`);
         const success = window.open(streamURL, '_blank');
-        if(!success){
+        if (!success) {
             window.location.href = streamURL;
         }
     }
@@ -596,7 +600,7 @@
             const infoHash = match[1];
             const os = detectOS();
 
-            if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
+            if (os == 'Windows' || os == 'MacOS' || os == 'ipad') {
                 const localPlayBtn = createLocalPlayButton(magnet, infoHash);
                 container.appendChild(localPlayBtn);
             }
@@ -628,14 +632,14 @@
             const os = detectOS();
 
             let localPlayBtn;
-            if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
+            if (os == 'Windows' || os == 'MacOS' || os == 'ipad') {
                 localPlayBtn = createLocalPlayButton(magnet, infoHash);
             }
 
             const webPlayBtn = createWebPlayButton(magnet, infoHash);
             const downloadBtn = createDownloadButton(magnet, infoHash);
 
-            if(os == 'Windows' || os == 'MacOS' || os == 'ipad'){
+            if (os == 'Windows' || os == 'MacOS' || os == 'ipad') {
                 magnetElement.parentNode.insertBefore(localPlayBtn, magnetElement.nextSibling);
                 magnetElement.parentNode.insertBefore(webPlayBtn, localPlayBtn.nextSibling);
                 magnetElement.parentNode.insertBefore(downloadBtn, webPlayBtn.nextSibling);
