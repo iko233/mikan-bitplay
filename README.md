@@ -17,7 +17,26 @@ docker run -d \
 
 ![image](https://github.com/user-attachments/assets/8deaa8fb-6162-4cc6-9276-94b3129f4d75)
 
+## 自定义服务器列表
 
+在 `script.js` 中修改 `SERVER_LIST` 常量即可添加额外的后台服务器，例如：
+
+```javascript
+const SERVER_LIST = [
+    { name: 'bitplay', url: 'https://bitplay.to', ping: 0 },
+    { name: 'custom',  url: 'https://example.com', ping: 0 }
+];
+```
+
+当使用自定义域名时，需要同步在脚本头部添加对应的 `@connect` 声明，可写多行或使用通配符：
+
+```javascript
+// @connect bitplay.to
+// @connect example.com
+// @connect *.example.net
+```
+
+如果没有更新 `@connect`，对这些地址的 `GM.xmlHttpRequest` 请求将会被阻止。
 
 ---------------------------------
 
