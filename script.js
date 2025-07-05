@@ -335,7 +335,7 @@
 
     // 新的下载文件函数
     function downloadFile(infoHash, fileIndex, fileName) {
-        const downloadURL = `https://bitplay.bitchigo.icu/api/v1/torrent/${infoHash}/stream/${fileIndex}/${fileName}.mp4`;
+        const downloadURL = `${currentServer.url}/api/v1/torrent/${infoHash}/stream/${fileIndex}/${fileName}.mp4`;
         console.log(`下载文件: ${downloadURL}`);
         window.open(downloadURL, '_blank');
     }
@@ -385,7 +385,7 @@
     }
 
     function playFileInBrowser(host, infoHash, fileIndex, fileName) {
-        const streamURL = `https://bitplay.bitchigo.icu/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
+        const streamURL = `${currentServer.url}/api/v1/torrent/${infoHash}/stream/${fileIndex}/stream.mp4`;
         console.log(`在浏览器中播放: ${streamURL}`);
         const success = window.open(streamURL, '_blank');
         if(!success){
