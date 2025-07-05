@@ -32,6 +32,7 @@
     let menuCommandIds = [];     // 存储菜单命令ID
     const supportsUnregister = typeof GM.unregisterMenuCommand === 'function';
 
+
     // 检测操作系统类型
     function detectOS() {
         const platform = navigator.platform.toLowerCase();
@@ -127,7 +128,7 @@
     }
 
     // 服务器管理
-    async function setServerIndex(index) {
+async function setServerIndex(index) {
         if (index >= 0 && index < SERVER_LIST.length) {
             try {
                 await GM.setValue(STORAGE_KEY, index);
@@ -144,7 +145,7 @@
         }
     }
 
-    function registerMenuCommands() {
+   function registerMenuCommands() {
         if (supportsUnregister) {
             menuCommandIds.forEach(id => {
                 try { GM.unregisterMenuCommand(id); } catch (e) { console.error(e); }
