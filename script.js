@@ -86,24 +86,37 @@
 
     // Ping测试功能（仅测试当前服务器）
     async function measurePing(url) {
-        try {
+        return new Promise((resolve, reject) => {
             const startTime = performance.now();
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const timeoutId = setTimeout(() => {
+                reject(new Error('Timeout exceeded'));
+            }, 5000);
 
-            await fetch(url + '/', {
+            // Request options
+            const options = {
                 method: 'HEAD',
-                mode: 'no-cors',
-                signal: controller.signal
-            });
+                url: url + '/assets/favicon.png',
+                onload: (response) => {
+                    clearTimeout(timeoutId);
+                    const endTime = performance.now();
+                    console.log('Ping成功:', url);
+                    resolve(Math.round(endTime - startTime));
+                },
+                onerror: (error) => {
+                    clearTimeout(timeoutId);
+                    console.log(`Ping测试失败: ${url}`, error);
+                    reject(new Error('Request failed'));
+                },
+                ontimeout: () => {
+                    clearTimeout(timeoutId);
+                    console.log('请求超时');
+                    reject(new Error('Request timeout'));
+                }
+            };
 
-            clearTimeout(timeoutId);
-            const endTime = performance.now();
-            return Math.round(endTime - startTime);
-        } catch (error) {
-            console.log(`Ping测试失败: ${url}`, error);
-            return 9999;
-        }
+            // Call makeRequest to send the request
+            makeRequest(options);
+        });
     }
 
     async function testCurrentServerPing() {
