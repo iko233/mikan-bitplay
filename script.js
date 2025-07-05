@@ -28,6 +28,7 @@
     let currentServer = SERVER_LIST[DEFAULT_SERVER_INDEX];
     let serverInfoDiv = null;
     let torrentIntervals = {}; // 存储种子定时器
+    let mutationObserver = null; // DOM变化监听器
 
     // 检测操作系统类型
     function detectOS() {
@@ -661,7 +662,25 @@
             addButtonsToBangumiPage();
         }
 
-        setTimeout(addPlayButtons, 1000);
+        if (!mutationObserver) {
+            mutationObserver = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.addedNodes.length || mutation.type === 'attributes') {
+                        if (isHomePage()) {
+                            addButtonsToHomePage();
+                        } else if (isBangumiPage()) {
+                            addButtonsToBangumiPage();
+                        }
+                        break;
+                    }
+                }
+            });
+
+            mutationObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
     }
 
     // 初始化和清理
@@ -698,6 +717,12 @@
             clearInterval(interval);
         });
         torrentIntervals = {};
+
+        if (mutationObserver) {
+            mutationObserver.disconnect();
+            mutationObserver = null;
+        }
+
         console.log('脚本资源已清理');
     });
 
