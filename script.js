@@ -29,6 +29,8 @@
     let serverInfoDiv = null;
     let torrentIntervals = {}; // 存储种子定时器
     let mutationObserver = null; // DOM变化监听器
+    let menuCommandIds = [];     // 存储菜单命令ID
+    const supportsUnregister = typeof GM.unregisterMenuCommand === 'function';
 
     // 检测操作系统类型
     function detectOS() {
@@ -129,7 +131,12 @@
         if (index >= 0 && index < SERVER_LIST.length) {
             try {
                 await GM.setValue(STORAGE_KEY, index);
-                window.location.reload();
+                currentServer = SERVER_LIST[index];
+                updateServerDisplay();
+                testCurrentServerPing();
+                if (supportsUnregister) {
+                    registerMenuCommands();
+                }
             } catch (error) {
                 console.error('保存服务器配置失败:', error);
                 alert('切换服务器失败，请稍后重试');
@@ -138,14 +145,36 @@
     }
 
     function registerMenuCommands() {
-        SERVER_LIST.forEach((server, index) => {
-            const prefix = (server.url === currentServer.url) ? '✓ ' : '';
-            GM.registerMenuCommand(
-                `${prefix}切换到服务器: ${server.name}`,
-                () => setServerIndex(index),
-                `${index + 1}`
-            );
-        });
+        if (supportsUnregister) {
+            menuCommandIds.forEach(id => {
+                try { GM.unregisterMenuCommand(id); } catch (e) { console.error(e); }
+            });
+            menuCommandIds = [];
+
+            SERVER_LIST.forEach((server, index) => {
+                const prefix = (server.url === currentServer.url) ? '✓ ' : '';
+                const id = GM.registerMenuCommand(
+                    `${prefix}切换到服务器: ${server.name}`,
+                    () => setServerIndex(index),
+                    `${index + 1}`
+                );
+                if (typeof id !== 'undefined') {
+                    menuCommandIds.push(id);
+                }
+            });
+        } else if (menuCommandIds.length === 0) {
+            const id = GM.registerMenuCommand('切换播放服务器', () => {
+                const list = SERVER_LIST.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
+                const choice = prompt(`选择服务器:\n${list}`, `${SERVER_LIST.indexOf(currentServer) + 1}`);
+                const idx = parseInt(choice, 10) - 1;
+                if (!isNaN(idx) && idx >= 0 && idx < SERVER_LIST.length) {
+                    setServerIndex(idx);
+                }
+            });
+            if (typeof id !== 'undefined') {
+                menuCommandIds.push(id);
+            }
+        }
     }
 
     // 种子管理
