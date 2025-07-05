@@ -29,6 +29,7 @@
     let serverInfoDiv = null;
     let torrentIntervals = {}; // 存储种子定时器
     let mutationObserver = null; // DOM变化监听器
+    let menuCommandIds = [];     // 存储菜单命令ID
 
     // 检测操作系统类型
     function detectOS() {
@@ -129,7 +130,10 @@
         if (index >= 0 && index < SERVER_LIST.length) {
             try {
                 await GM.setValue(STORAGE_KEY, index);
-                window.location.reload();
+                currentServer = SERVER_LIST[index];
+                updateServerDisplay();
+                testCurrentServerPing();
+                registerMenuCommands();
             } catch (error) {
                 console.error('保存服务器配置失败:', error);
                 alert('切换服务器失败，请稍后重试');
@@ -138,13 +142,23 @@
     }
 
     function registerMenuCommands() {
+        if (typeof GM.unregisterMenuCommand === 'function') {
+            menuCommandIds.forEach(id => {
+                try { GM.unregisterMenuCommand(id); } catch (e) { console.error(e); }
+            });
+            menuCommandIds = [];
+        }
+
         SERVER_LIST.forEach((server, index) => {
             const prefix = (server.url === currentServer.url) ? '✓ ' : '';
-            GM.registerMenuCommand(
+            const id = GM.registerMenuCommand(
                 `${prefix}切换到服务器: ${server.name}`,
                 () => setServerIndex(index),
                 `${index + 1}`
             );
+            if (typeof id !== 'undefined') {
+                menuCommandIds.push(id);
+            }
         });
     }
 
