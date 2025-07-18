@@ -20,7 +20,7 @@ docker run -d \
 在 `script.js` 中修改 `SERVER_LIST` 常量即可添加额外的后台服务器，例如：
 
 ```javascript
-const SERVER_LIST = [
+let SERVER_LIST = [
     { name: 'bitplay', url: 'https://bitplay.to', ping: 0 },
     { name: 'custom',  url: 'https://example.com', ping: 0 }
 ];
@@ -39,6 +39,7 @@ const SERVER_LIST = [
 ### 远程服务器列表配置
 
 脚本还支持从远程地址获取服务器列表，地址由 `SERVER_LIST_URL` 常量配置。
+若配置此项,SERVER_LIST的值会无效
 远程接口需要返回如下格式的 JSON：
 
 ```json
