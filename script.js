@@ -14,17 +14,21 @@
 // @icon https://mikanani.me/images/favicon.ico?v=2
 // ==/UserScript==
 
+
 (function () {
     'use strict';
 
-    // 服务器配置列表
-    const SERVER_LIST = [
+    // 服务器配置
+    const SERVER_LIST_URL = 'https://bitplay.to/config'; //response:{"serverList":[{"name":"bitplay","url":"https://bitplay.to"}]}
+    let SERVER_LIST = [
         { name: 'bitplay', url: 'https://bitplay.to', ping: 0 }
     ];
 
     const DEFAULT_SERVER_INDEX = 0;
     const STORAGE_KEY = 'bitplay_server_index';
+    const SERVER_LIST_STORAGE_KEY = 'bitplay_server_list';
     const TORRENT_REFRESH_INTERVAL = 10 * 60 * 1000; // 10分钟种子刷新间隔
+    const SERVER_LIST_CACHE_MAX_AGE = 12 * 60 * 60 * 1000; // 12小时服务器信息缓存时间
 
     let currentServer = SERVER_LIST[DEFAULT_SERVER_INDEX];
     let serverInfoDiv = null;
@@ -54,6 +58,73 @@
             location.pathname.startsWith('/Home/Classic');
     }
 
+    async function fetchServerList() {
+        return new Promise((resolve, reject) => {
+            makeRequest({
+                method: 'GET',
+                url: SERVER_LIST_URL,
+                onload(res) {
+                    try {
+                        const data = JSON.parse(res.responseText);
+                        if (data && Array.isArray(data.serverList)) {
+                            SERVER_LIST = data.serverList.map(s => ({ ...s, ping: 0 }));
+                            GM.setValue(
+                                SERVER_LIST_STORAGE_KEY,
+                                JSON.stringify({ time: Date.now(), list: data.serverList })
+                            );
+                            resolve();
+                        } else {
+                            reject(new Error('Invalid format'));
+                        }
+                    } catch (e) {
+                        reject(e);
+                    }
+                },
+                onerror: () => reject(new Error('Request failed')),
+                ontimeout: () => reject(new Error('Request timeout'))
+            });
+        });
+    }
+    async function refreshServerList() {
+        const oldUrl = currentServer.url;
+        await fetchServerList();
+        let idx = 0;
+        for (let i = 0; i < SERVER_LIST.length; i++) {
+            if (SERVER_LIST[i].url == oldUrl) {
+                idx = i;
+                break;
+            }
+        }
+        await GM.setValue(STORAGE_KEY, idx);
+        currentServer = SERVER_LIST[idx];
+        await testServerListPing();
+        registerMenuCommands();
+    }
+
+
+    async function loadServerListFromCache() {
+        try {
+            const cached = await GM.getValue(SERVER_LIST_STORAGE_KEY, null);
+            if (cached) {
+                const data = JSON.parse(cached);
+                console.log("存在缓存信息", data)
+                if (data && Array.isArray(data.list)) {
+                    // 缓存有效
+                    if (Date.now() - data.time < SERVER_LIST_CACHE_MAX_AGE) {
+                        console.log("缓存有效");
+                        SERVER_LIST = data.list.map(s => ({ ...s, ping: 0 }));
+                        return;
+                    }
+                    console.log("缓存无效");
+                }
+                return;
+            }
+            console.log("不存在缓存信息")
+        } catch (e) {
+            console.error('读取服务器列表缓存失败:', e);
+        }
+    }
+
     // 网络请求封装
     function makeRequest(options) {
         console.log('=== 发起网络请求 ===');
@@ -66,6 +137,7 @@
 
         options.onload = function (response) {
             console.log('=== 收到网络响应 ===');
+            console.log('内容:', response.responseText)
             console.log('状态码:', response.status);
             if (originalOnload) originalOnload(response);
         };
@@ -84,7 +156,7 @@
         return GM.xmlHttpRequest(options);
     }
 
-    // Ping测试功能（仅测试当前服务器）
+    // Ping测试功能
     async function measurePing(url) {
         return new Promise((resolve, reject) => {
             const startTime = performance.now();
@@ -105,12 +177,12 @@
                 onerror: (error) => {
                     clearTimeout(timeoutId);
                     console.log(`Ping测试失败: ${url}`, error);
-                    reject(new Error('Request failed'));
+                    resolve(9999999999);
                 },
                 ontimeout: () => {
                     clearTimeout(timeoutId);
                     console.log('请求超时');
-                    reject(new Error('Request timeout'));
+                    resolve(9999999999);
                 }
             };
 
@@ -121,17 +193,41 @@
 
     async function testCurrentServerPing() {
         console.log('开始测试当前服务器ping...');
-        const ping = await measurePing(currentServer.url);
+        let ping = 9999999999;
+        try{
+            ping = await measurePing(currentServer.url);
+        }catch(error){
+            console.error('服务器连接失败', error);
+        }
         currentServer.ping = ping;
         console.log(`服务器 ${currentServer.name} ping: ${ping}ms`);
         updateServerDisplay();
     }
 
+    async function testServerListPing() {
+        console.log('开始测试服务器ping...');
+        for(let i =0;i<SERVER_LIST.length;i++){
+            let ping = 9999999999;
+            try{
+                ping = await measurePing(currentServer.url);
+            }catch(error){
+                console.error('服务器连接失败', error);
+            }
+            SERVER_LIST[i].ping = ping;
+            if (9999999999 == currentServer.ping) {
+                console.log(`服务器 ${SERVER_LIST[i].name} 无效`);
+            } else {
+                console.log(`服务器 ${SERVER_LIST[i].name} ping: ${ping}ms`);
+            }
+        }
+        updateServerDisplay();
+    }
+
     function updateServerDisplay() {
         if (serverInfoDiv) {
-            const pingText = currentServer.ping === 9999 ? '超时' : `${currentServer.ping}ms`;
+            const pingText = currentServer.ping === 9999999999 ? '超时' : `${currentServer.ping}ms`;
             const pingColor = currentServer.ping < 100 ? '#4CAF50' :
-                currentServer.ping < 300 ? '#FF9800' : '#F44336';
+                currentServer.ping < 500 ? '#FF9800' : '#F44336';
             serverInfoDiv.innerHTML = `
                 当前播放服务器: ${currentServer.name}
                 <span style="color: ${pingColor}; font-weight: bold;">(${pingText})</span>
@@ -145,8 +241,9 @@
             try {
                 await GM.setValue(STORAGE_KEY, index);
                 currentServer = SERVER_LIST[index];
+                serverInfoDiv.textContent = `当前播放服务器: ${currentServer.name} (测试中...)`;
+                await testCurrentServerPing();
                 updateServerDisplay();
-                testCurrentServerPing();
                 registerMenuCommands();
             } catch (error) {
                 console.error('保存服务器配置失败:', error);
@@ -167,7 +264,7 @@
         SERVER_LIST.forEach((server, index) => {
             const prefix = (server.url === currentServer.url) ? '✓ ' : '';
             GM.registerMenuCommand(
-                `${prefix}切换到服务器: ${server.name}`,
+                9999999999 == server.ping? `${prefix}切换到服务器: ${server.name}(超时)`:`${prefix}切换到服务器: ${server.name}(${server.ping}ms)`,
                 () => setServerIndex(index),
                 `${index + 1}`
             ).then(id => {
@@ -176,6 +273,23 @@
                     menuCommandIds.push(id);
                 }
             })
+        });
+
+        GM.registerMenuCommand(
+            '🔄 刷新服务器列表',
+            async () => {
+                try {
+                    await refreshServerList();
+                } catch (e) {
+                    console.error('刷新服务器列表失败:', e);
+                    alert('刷新服务器列表失败，请稍后重试');
+                }
+            },
+            'r'
+        ).then(id => {
+            if (typeof id !== 'undefined') {
+                menuCommandIds.push(id);
+            }
         });
     }
 
@@ -716,25 +830,39 @@
 
     // 初始化和清理
     async function initialize() {
+        // 如果配置了远程服务器从远程服务器拉取服务器信息
+        if (SERVER_LIST_URL && SERVER_LIST_URL != '') {
+            SERVER_LIST = [];
+            await loadServerListFromCache();
+            if (!SERVER_LIST || SERVER_LIST.length == 0) {
+                try {
+                    await fetchServerList();
+                } catch (e) {
+                    console.error('获取服务器列表失败:', e);
+                }
+            }
+        }
         try {
             // 加载保存的服务器配置
             const serverIndex = await GM.getValue(STORAGE_KEY, DEFAULT_SERVER_INDEX);
             if (serverIndex >= 0 && serverIndex < SERVER_LIST.length) {
                 currentServer = SERVER_LIST[serverIndex];
+            } else {
+                currentServer = SERVER_LIST[DEFAULT_SERVER_INDEX];
             }
         } catch (error) {
             console.error('加载配置失败:', error);
             currentServer = SERVER_LIST[DEFAULT_SERVER_INDEX];
         }
 
-        // 注册菜单命令
-        registerMenuCommands();
-
         // 添加服务器信息显示
         addServerInfoToPage();
 
         // 测试当前服务器ping（仅一次）
-        testCurrentServerPing();
+        await testServerListPing();
+
+        // 注册菜单命令
+        registerMenuCommands();
 
         // 开始添加播放按钮
         addPlayButtons();
