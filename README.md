@@ -36,6 +36,18 @@ const SERVER_LIST = [
 
 如果没有更新 `@connect`，对这些地址的 `GM.xmlHttpRequest` 请求将会被阻止。
 
+### 远程服务器列表配置
+
+脚本还支持从远程地址获取服务器列表，地址由 `SERVER_LIST_URL` 常量配置。
+远程接口需要返回如下格式的 JSON：
+
+```json
+{ "serverList": [ { "name": "bitplay", "url": "https://bitplay.to" } ] }
+```
+
+当 `SERVER_LIST_URL` 设置为非空值时，脚本会优先从远程加载列表，
+并将结果缓存 12 小时以减少请求次数。
+
 ---------------------------------
 
 优化项：
